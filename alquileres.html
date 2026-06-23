@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestión de Alquileres</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f5f0;
+    --surface: #ffffff;
+    --border: #e2e0db;
+    --text: #1a1a18;
+    --text-muted: #888;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --red: #dc2626;
+    --red-light: #fef2f2;
+    --amber: #d97706;
+    --amber-light: #fffbeb;
+    --green: #16a34a;
+    --green-light: #f0fdf4;
+    --purple: #7c3aed;
+    --purple-light: #f5f3ff;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+  }
+
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* ═══════════════════════════════════════════
+     AUTH SCREEN
+  ═══════════════════════════════════════════ */
+  #auth-screen {
+    position: fixed; inset: 0; z-index: 999;
+    background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  #auth-screen.hidden { display: none; }
+
+  .auth-card {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 24px 64px rgba(0,0,0,.25);
+    text-align: center;
+  }
+  .auth-logo { font-size: 36px; margin-bottom: 8px; }
+  .auth-title { font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+  .auth-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 28px; }
+
+  .auth-form { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+  .auth-label { font-size: 12px; font-weight: 600; color: #555; margin-bottom: 5px; display: block; }
+
+  .password-wrap { position: relative; }
+  .password-wrap input { padding-right: 42px; }
+  .toggle-pw {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer; font-size: 16px;
+    color: var(--text-muted); padding: 2px;
+  }
+
+  .auth-error {
+    background: var(--red-light);
+    color: var(--red);
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    display: none;
+  }
+  .auth-error.show { display: block; }
+
+  .auth-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 4px;
+  }
+
+  .btn-auth {
+    width: 100%;
+    padding: 12px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s;
+    margin-top: 4px;
+  }
+  .btn-auth:hover { background: #1d4ed8; }
+  .btn-auth:disabled { opacity: .6; cursor: default; }
+
+  /* Setup screen */
+  .setup-steps { display: flex; gap: 8px; margin-bottom: 6px; }
+  .step-dot { width: 8px; height: 8px; border-radius: 99px; background: var(--border); transition: background .3s; }
+  .step-dot.active { background: var(--accent); }
+
+  /* ═══════════════════════════════════════════
+     CHANGE PASSWORD MODAL
+  ═══════════════════════════════════════════ */
+  #modal-change-pw .modal { max-width: 400px; }
+
+  /* ═══════════════════════════════════════════
+     MAIN APP
+  ═══════════════════════════════════════════ */
+  #app-shell { display: flex; flex-direction: column; flex: 1; }
+  #app-shell.hidden { display: none; }
+
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .logo { font-size: 16px; font-weight: 700; letter-spacing: -.3px; }
+  .logo span { color: var(--accent); }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+
+  .app { display: flex; flex: 1; height: calc(100vh - 56px); overflow: hidden; }
+
+  /* SIDEBAR */
+  .sidebar { width: 260px; min-width: 260px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  .sidebar-header { padding: 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .sidebar-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); }
+  .prop-list { overflow-y: auto; flex: 1; padding: 8px; }
+  .prop-item { padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: background .15s; display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
+  .prop-item:hover { background: var(--bg); }
+  .prop-item.active { background: var(--accent-light); }
+  .prop-item.active .prop-name { color: var(--accent); font-weight: 600; }
+  .prop-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--accent-light); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .prop-name { font-size: 14px; font-weight: 500; }
+  .prop-meta { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .badge { margin-left: auto; background: var(--red); color: white; border-radius: 99px; font-size: 10px; font-weight: 700; padding: 1px 6px; flex-shrink: 0; }
+  .search-bar { padding: 10px 16px; border-bottom: 1px solid var(--border); }
+  .search-bar input { background: var(--bg); border-color: var(--bg); font-size: 13px; }
+  .search-bar input:focus { background: white; border-color: var(--accent); }
+
+  /* MAIN */
+  .main { flex: 1; overflow-y: auto; padding: 24px; }
+  .panel-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .panel-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+  .section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--text-muted); margin-bottom: 10px; margin-top: 24px; }
+  .section-label:first-of-type { margin-top: 0; }
+
+  /* NOTE CARDS */
+  .note-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px; display: flex; gap: 14px; align-items: flex-start; box-shadow: var(--shadow); transition: border-color .15s; }
+  .note-card:hover { border-color: #c5c2bb; }
+  .note-type-dot { width: 36px; height: 36px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; margin-top: 1px; }
+  .type-contract .note-type-dot { background: var(--red-light); }
+  .type-free .note-type-dot { background: var(--purple-light); }
+  .note-body { flex: 1; min-width: 0; }
+  .note-prop { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+  .note-text { font-size: 14px; font-weight: 500; line-height: 1.4; }
+  .note-footer { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+  .note-date { font-size: 12px; color: var(--text-muted); }
+  .tag { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; }
+  .tag-contract { background: var(--red-light); color: var(--red); }
+  .tag-free { background: var(--purple-light); color: var(--purple); }
+  .days-chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; margin-left: auto; }
+  .days-overdue { background: var(--red-light); color: var(--red); }
+  .days-soon { background: var(--amber-light); color: var(--amber); }
+  .days-ok { background: var(--green-light); color: var(--green); }
+  .note-actions { display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
+  .note-card:hover .note-actions { opacity: 1; }
+
+  /* PAYMENT CARD */
+  .payment-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; box-shadow: var(--shadow); overflow: hidden; transition: border-color .15s; }
+  .payment-card:hover { border-color: #c5c2bb; }
+  .payment-card.status-paid    { border-left: 4px solid var(--green); }
+  .payment-card.status-due     { border-left: 4px solid var(--amber); }
+  .payment-card.status-overdue { border-left: 4px solid var(--red); }
+  .payment-main { padding: 14px 16px; display: flex; align-items: center; gap: 14px; }
+  .payment-icon { width: 36px; height: 36px; border-radius: 9px; background: var(--amber-light); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .payment-info { flex: 1; min-width: 0; }
+  .payment-prop { font-size: 11px; color: var(--text-muted); margin-bottom: 1px; }
+  .payment-name { font-size: 14px; font-weight: 600; }
+  .payment-detail { font-size: 12px; color: var(--text-muted); margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .payment-amount { font-size: 15px; font-weight: 700; color: var(--text); margin-right: 4px; }
+  .payment-status-chip { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 99px; }
+  .chip-paid    { background: var(--green-light); color: var(--green); }
+  .chip-due     { background: var(--amber-light); color: var(--amber); }
+  .chip-overdue { background: var(--red-light);   color: var(--red); }
+  .payment-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .btn-mark-paid { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 8px; border: none; cursor: pointer; font-size: 12px; font-weight: 600; transition: all .15s; white-space: nowrap; background: var(--green-light); color: var(--green); }
+  .btn-mark-paid:hover { background: #dcfce7; }
+  .payment-history { border-top: 1px solid var(--border); padding: 8px 16px; background: var(--bg); font-size: 11px; color: var(--text-muted); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .history-pill { background: var(--surface); border: 1px solid var(--border); border-radius: 99px; padding: 2px 8px; font-size: 11px; color: var(--green); font-weight: 600; }
+
+  /* BUTTONS */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s; white-space: nowrap; }
+  .btn-primary   { background: var(--accent); color: white; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: var(--bg); }
+  .btn-danger    { background: var(--red-light); color: var(--red); }
+  .btn-danger:hover { background: #fee2e2; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .icon-btn { width: 28px; height: 28px; border-radius: 6px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 13px; transition: background .15s; color: var(--text-muted); }
+  .icon-btn:hover { background: var(--bg); color: var(--text); }
+  .icon-btn.danger:hover { background: var(--red-light); color: var(--red); }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(2px); opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal { background: var(--surface); border-radius: 14px; width: 100%; max-width: 460px; box-shadow: 0 20px 60px rgba(0,0,0,.2); transform: translateY(12px); transition: transform .2s; }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal-header { padding: 20px 24px 0; display: flex; align-items: center; justify-content: space-between; }
+  .modal-title  { font-size: 17px; font-weight: 700; }
+  .modal-body   { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .modal-footer { padding: 0 24px 20px; display: flex; justify-content: flex-end; gap: 8px; }
+
+  /* FORM */
+  label { font-size: 12px; font-weight: 600; display: block; margin-bottom: 5px; color: #555; }
+  input, textarea, select { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-family: inherit; color: var(--text); background: var(--surface); transition: border-color .15s; outline: none; }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+  textarea { resize: vertical; min-height: 70px; }
+  .field-row { display: flex; gap: 12px; }
+  .field-row > div { flex: 1; }
+  .hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+  /* TYPE SELECTOR */
+  .type-selector { display: flex; gap: 8px; }
+  .type-opt { flex: 1; border: 1.5px solid var(--border); border-radius: 9px; padding: 10px 8px; text-align: center; cursor: pointer; transition: all .15s; font-size: 13px; font-weight: 500; color: var(--text-muted); }
+  .type-opt .type-emoji { font-size: 20px; display: block; margin-bottom: 4px; }
+  .type-opt.selected-contract { border-color: var(--red);    background: var(--red-light);    color: var(--red); }
+  .type-opt.selected-free     { border-color: var(--purple); background: var(--purple-light); color: var(--purple); }
+
+  /* DAY GRID */
+  .period-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+  .day-btn { aspect-ratio: 1; border: 1.5px solid var(--border); border-radius: 7px; font-size: 13px; font-weight: 600; background: transparent; cursor: pointer; transition: all .15s; color: var(--text-muted); display: flex; align-items: center; justify-content: center; }
+  .day-btn:hover { border-color: var(--amber); background: var(--amber-light); color: var(--amber); }
+  .day-btn.selected { border-color: var(--amber); background: var(--amber); color: white; }
+
+  /* ALERT */
+  .alert-banner { background: var(--red-light); border: 1px solid #fca5a5; border-radius: 9px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; color: var(--red); display: flex; align-items: center; gap: 8px; }
+
+  /* EMPTY */
+  .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+  .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .empty-sub { font-size: 14px; }
+
+  /* PROP DETAIL */
+  .prop-detail-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; gap: 16px; }
+  .prop-detail-title { font-size: 22px; font-weight: 700; }
+  .prop-detail-addr  { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+  .prop-action-row   { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+
+  .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #d1cfc9; border-radius: 99px; }
+
+  /* Spinner for async ops */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.3); border-top-color: white; border-radius: 50%; animation: spin .6s linear infinite; display: inline-block; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     AUTH SCREEN
+═══════════════════════════════════════════ -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">🏢</div>
+    <div class="auth-title">Inmobiliaria Pro</div>
+    <div class="auth-sub" id="auth-subtitle">Ingresá la contraseña para continuar</div>
+
+    <!-- LOGIN VIEW -->
+    <div id="view-login">
+      <div class="auth-form">
+        <div>
+          <label class="auth-label">Contraseña</label>
+          <div class="password-wrap">
+            <input type="password" id="login-pw" placeholder="••••••••" autocomplete="current-password">
+            <button type="button" class="toggle-pw" onclick="togglePw('login-pw',this)">👁️</button>
+          </div>
+        </div>
+        <div class="auth-error" id="login-error">Contraseña incorrecta. Intentá de nuevo.</div>
+        <button class="btn-auth" id="login-btn" onclick="doLogin()">Entrar</button>
+      </div>
+      <p class="auth-hint" style="margin-top:20px;font-size:10px">
+        Acceso restringido · Compartido por 3 personas
+      </p>
+    </div>
+
+    <!-- ADMIN SETUP VIEW (solo cuando SHARED_HASH está vacío) -->
+    <div id="view-setup" style="display:none">
+      <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:14px;margin-bottom:16px;font-size:12px;color:#92400e;text-align:left;line-height:1.5">
+        ⚙️ <strong>Modo configuración</strong><br>
+        Esta pantalla solo aparece una vez, cuando el archivo no tiene contraseña configurada.
+        Después de generar el hash, actualizá el archivo y nadie más podrá entrar sin la contraseña.
+      </div>
+      <div class="auth-form" id="setup-form">
+        <div>
+          <label class="auth-label">Elegí la contraseña compartida</label>
+          <div class="password-wrap">
+            <input type="password" id="setup-pw" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+            <button type="button" class="toggle-pw" onclick="togglePw('setup-pw',this)">👁️</button>
+          </div>
+        </div>
+        <div class="auth-error" id="setup-error"></div>
+        <button class="btn-auth" id="setup-btn" onclick="generateHash()">Generar hash →</button>
+      </div>
+
+      <!-- Resultado del hash -->
+      <div id="setup-result" style="display:none;text-align:left;margin-top:16px">
+        <div style="font-size:12px;font-weight:600;color:#555;margin-bottom:6px">
+          ✅ Hash generado. Seguí estos pasos:
+        </div>
+        <ol style="font-size:12px;color:#555;padding-left:18px;line-height:1.8">
+          <li>Abrí el archivo <code style="background:#f3f4f6;padding:1px 5px;border-radius:4px">alquileres.html</code> en un editor de texto</li>
+          <li>Buscá la línea con <code style="background:#f3f4f6;padding:1px 5px;border-radius:4px">SHARED_HASH</code></li>
+          <li>Reemplazala con el código de abajo</li>
+          <li>Guardá, hacé commit y push a GitHub</li>
+        </ol>
+        <div style="position:relative;margin-top:10px">
+          <div id="hash-snippet" style="background:#1e1e2e;color:#cdd6f4;border-radius:9px;padding:12px 14px;font-family:monospace;font-size:11px;word-break:break-all;line-height:1.6"></div>
+          <button onclick="copyHash()" style="position:absolute;top:8px;right:8px;background:#313244;color:#cdd6f4;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer" id="copy-btn">Copiar</button>
+        </div>
+        <p style="font-size:11px;color:var(--text-muted);margin-top:10px">
+          💡 Guardá la contraseña en un lugar seguro (ej: un gestor de contraseñas). No hay forma de recuperarla.
+        </p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     APP SHELL
+═══════════════════════════════════════════ -->
+<div id="app-shell" class="hidden">
+  <header>
+    <div class="logo">🏢 Inmobiliaria <span>Pro</span></div>
+    <div class="header-right">
+      <button class="btn btn-secondary btn-sm" onclick="openView('timeline')">📅 Agenda</button>
+      <button class="btn btn-primary btn-sm" onclick="showAddProp()">+ Propiedad</button>
+      <button class="icon-btn" title="Opciones" onclick="openModal('modal-user-menu')" style="font-size:18px">⚙️</button>
+    </div>
+  </header>
+
+  <div class="app">
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-title">Propiedades</span>
+        <span id="prop-count" style="font-size:12px;color:var(--text-muted)">0</span>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="search-input" placeholder="🔍  Buscar…" oninput="renderSidebar()">
+      </div>
+      <div class="prop-list" id="prop-list"></div>
+    </div>
+    <div class="main" id="main-content">
+      <div class="empty">
+        <div class="empty-icon">🏘️</div>
+        <div class="empty-title">Bienvenido</div>
+        <div class="empty-sub">Agregá una propiedad para empezar, o revisá la <strong>Agenda</strong>.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: User menu / settings -->
+<div class="modal-overlay" id="modal-user-menu">
+  <div class="modal" style="max-width:320px">
+    <div class="modal-header">
+      <span class="modal-title">⚙️ Configuración</span>
+      <button class="icon-btn" onclick="closeModal('modal-user-menu')">✕</button>
+    </div>
+    <div class="modal-body" style="gap:8px">
+      <button class="btn btn-secondary" style="width:100%;justify-content:flex-start" onclick="closeModal('modal-user-menu');openModal('modal-change-pw')">🔑 Cambiar contraseña</button>
+      <button class="btn btn-danger" style="width:100%;justify-content:flex-start" onclick="doLogout()">🚪 Cerrar sesión</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Cambiar contraseña -->
+<div class="modal-overlay" id="modal-change-pw">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <span class="modal-title">🔑 Cambiar contraseña</span>
+      <button class="icon-btn" onclick="closeModal('modal-change-pw')">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- Paso 1: verificar y generar nuevo hash -->
+      <div id="chpw-step1">
+        <div>
+          <label>Contraseña actual</label>
+          <div class="password-wrap">
+            <input type="password" id="chpw-current" placeholder="••••••••" autocomplete="current-password">
+            <button type="button" class="toggle-pw" onclick="togglePw('chpw-current',this)">👁️</button>
+          </div>
+        </div>
+        <div>
+          <label>Nueva contraseña</label>
+          <div class="password-wrap">
+            <input type="password" id="chpw-new1" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+            <button type="button" class="toggle-pw" onclick="togglePw('chpw-new1',this)">👁️</button>
+          </div>
+        </div>
+        <div>
+          <label>Confirmar nueva contraseña</label>
+          <div class="password-wrap">
+            <input type="password" id="chpw-new2" placeholder="Repetí la contraseña" autocomplete="new-password">
+            <button type="button" class="toggle-pw" onclick="togglePw('chpw-new2',this)">👁️</button>
+          </div>
+        </div>
+        <div class="auth-error" id="chpw-error"></div>
+      </div>
+
+      <!-- Paso 2: mostrar nuevo hash para actualizar el archivo -->
+      <div id="chpw-step2" style="display:none">
+        <div style="background:var(--green-light);border:1px solid #86efac;border-radius:9px;padding:12px 14px;font-size:13px;color:var(--green);margin-bottom:4px">
+          ✅ Hash generado. Ahora actualizá el archivo para que la nueva contraseña funcione para todos.
+        </div>
+        <ol style="font-size:12px;color:#555;padding-left:18px;line-height:1.8;margin-top:10px">
+          <li>Abrí <code style="background:#f3f4f6;padding:1px 5px;border-radius:4px">alquileres.html</code> en un editor</li>
+          <li>Buscá la línea con <code style="background:#f3f4f6;padding:1px 5px;border-radius:4px">SHARED_HASH</code></li>
+          <li>Reemplazala con el código de abajo</li>
+          <li>Guardá → commit → push a GitHub</li>
+        </ol>
+        <div style="position:relative;margin-top:10px">
+          <div id="chpw-snippet" style="background:#1e1e2e;color:#cdd6f4;border-radius:9px;padding:12px 14px;font-family:monospace;font-size:11px;word-break:break-all;line-height:1.6"></div>
+          <button onclick="copyChpwHash()" style="position:absolute;top:8px;right:8px;background:#313244;color:#cdd6f4;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer" id="copy-chpw-btn">Copiar</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" id="chpw-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-change-pw')">Cancelar</button>
+      <button class="btn btn-primary" id="chpw-generate-btn" onclick="doGenerateNewHash()">Generar nuevo hash →</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Propiedad -->
+<div class="modal-overlay" id="modal-prop">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-prop-title">Nueva Propiedad</span>
+      <button class="icon-btn" onclick="closeModal('modal-prop')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div><label>Nombre *</label><input type="text" id="prop-name" placeholder="Ej: Depto Palermo 2B"></div>
+      <div><label>Dirección</label><input type="text" id="prop-addr" placeholder="Ej: Av. Santa Fe 1234, piso 2"></div>
+      <div><label>Inquilino / Contacto</label><input type="text" id="prop-tenant" placeholder="Ej: Juan García"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-prop')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveProp()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Pago -->
+<div class="modal-overlay" id="modal-payment">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-payment-title">Nuevo Pago Recurrente</span>
+      <button class="icon-btn" onclick="closeModal('modal-payment')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div><label>Concepto *</label><input type="text" id="pay-name" placeholder="Ej: Alquiler mensual, Expensas…"></div>
+      <div class="field-row">
+        <div><label>Importe (opcional)</label><input type="number" id="pay-amount" placeholder="Ej: 150000" min="0" step="0.01"></div>
+        <div><label>Moneda</label>
+          <select id="pay-currency">
+            <option value="$">$ Pesos</option>
+            <option value="U$S">U$S Dólares</option>
+            <option value="€">€ Euros</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label>Día de vencimiento cada mes</label>
+        <div class="period-grid" id="day-grid"></div>
+        <div class="hint">Elegí el día del mes en que vence este pago.</div>
+      </div>
+      <div>
+        <label>Próximo vencimiento</label>
+        <input type="date" id="pay-next-due">
+        <div class="hint">Se actualizará automáticamente al marcar como cobrado.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-payment')">Cancelar</button>
+      <button class="btn btn-primary" onclick="savePayment()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Nota -->
+<div class="modal-overlay" id="modal-note">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-note-title">Nueva Nota</span>
+      <button class="icon-btn" onclick="closeModal('modal-note')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div>
+        <label>Tipo</label>
+        <div class="type-selector">
+          <div class="type-opt" data-type="contract" onclick="selectType('contract')"><span class="type-emoji">📄</span>Vencimiento</div>
+          <div class="type-opt" data-type="free"     onclick="selectType('free')"><span class="type-emoji">📝</span>Nota libre</div>
+        </div>
+      </div>
+      <div><label>Descripción *</label><textarea id="note-text" placeholder="Ej: Vencimiento del contrato anual…"></textarea></div>
+      <div><label>Fecha</label><input type="date" id="note-date"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-note')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveNote()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Confirmar -->
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-header"><span class="modal-title">¿Eliminar?</span></div>
+    <div class="modal-body"><p id="confirm-msg" style="font-size:14px;color:var(--text-muted)"></p></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-confirm')">Cancelar</button>
+      <button class="btn btn-danger" id="confirm-ok-btn">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  AUTH — contraseña compartida con hash en código
+// ═══════════════════════════════════════════════
+//
+//  ┌─────────────────────────────────────────────┐
+//  │  CONTRASEÑA COMPARTIDA                       │
+//  │  Pegá aquí el hash generado por la app.      │
+//  │  Vacío ("") = modo configuración inicial.    │
+//  └─────────────────────────────────────────────┘
+const SHARED_HASH  = "014ceedbc1bfbdeaedc10504dcb2789cee7a153d1b8e3f27ab81db314e4e79a8";
+const SESSION_KEY  = 'inmo-session';
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function initAuth() {
+  if (!SHARED_HASH) {
+    // Sin contraseña configurada → modo admin setup
+    document.getElementById('auth-subtitle').textContent = 'Configuración inicial de contraseña';
+    document.getElementById('view-login').style.display = 'none';
+    document.getElementById('view-setup').style.display = 'block';
+  } else if (sessionStorage.getItem(SESSION_KEY) === 'ok') {
+    showApp();
+  }
+  // else: pantalla de login por defecto
+}
+
+async function doLogin() {
+  const pw  = document.getElementById('login-pw').value;
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('login-error');
+  if (!pw) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  const hash = await sha256(pw);
+
+  if (hash === SHARED_HASH) {
+    sessionStorage.setItem(SESSION_KEY, 'ok');
+    err.classList.remove('show');
+    showApp();
+  } else {
+    err.classList.add('show');
+    document.getElementById('login-pw').value = '';
+    document.getElementById('login-pw').focus();
+    btn.disabled = false;
+    btn.textContent = 'Entrar';
+  }
+}
+
+// ── SETUP INICIAL (solo cuando SHARED_HASH === "") ──
+let _generatedHash = '';
+
+async function generateHash() {
+  const pw  = document.getElementById('setup-pw').value;
+  const err = document.getElementById('setup-error');
+  const btn = document.getElementById('setup-btn');
+  if (pw.length < 6) {
+    err.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+    err.classList.add('show'); return;
+  }
+  err.classList.remove('show');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner" style="border-top-color:#fff"></span>';
+
+  _generatedHash = await sha256(pw);
+  const snippet = `const SHARED_HASH = "${_generatedHash}";`;
+  document.getElementById('hash-snippet').textContent = snippet;
+  document.getElementById('setup-result').style.display = 'block';
+  btn.disabled = false;
+  btn.textContent = 'Generar hash →';
+}
+
+function copyHash() {
+  const snippet = `const SHARED_HASH = "${_generatedHash}";`;
+  navigator.clipboard.writeText(snippet).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = '✓ Copiado'; setTimeout(() => btn.textContent = 'Copiar', 2000);
+  });
+}
+
+// ── CAMBIO DE CONTRASEÑA (desde configuración) ──
+let _newHash = '';
+
+async function doGenerateNewHash() {
+  const current = document.getElementById('chpw-current').value;
+  const new1    = document.getElementById('chpw-new1').value;
+  const new2    = document.getElementById('chpw-new2').value;
+  const err     = document.getElementById('chpw-error');
+  err.classList.remove('show');
+
+  if (!current || !new1 || !new2) { err.textContent = 'Completá todos los campos.'; err.classList.add('show'); return; }
+  if (new1.length < 6) { err.textContent = 'Mínimo 6 caracteres.'; err.classList.add('show'); return; }
+  if (new1 !== new2)   { err.textContent = 'Las contraseñas nuevas no coinciden.'; err.classList.add('show'); return; }
+
+  const currentHash = await sha256(current);
+  if (currentHash !== SHARED_HASH) {
+    err.textContent = 'La contraseña actual es incorrecta.'; err.classList.add('show'); return;
+  }
+
+  _newHash = await sha256(new1);
+  const snippet = `const SHARED_HASH = "${_newHash}";`;
+  document.getElementById('chpw-snippet').textContent = snippet;
+  document.getElementById('chpw-step1').style.display = 'none';
+  document.getElementById('chpw-step2').style.display = 'block';
+  document.getElementById('chpw-footer').innerHTML =
+    `<button class="btn btn-secondary" onclick="resetChpwModal()">← Volver</button>
+     <button class="btn btn-secondary" onclick="closeModal('modal-change-pw')">Cerrar</button>`;
+}
+
+function copyChpwHash() {
+  navigator.clipboard.writeText(`const SHARED_HASH = "${_newHash}";`).then(() => {
+    const btn = document.getElementById('copy-chpw-btn');
+    btn.textContent = '✓ Copiado'; setTimeout(() => btn.textContent = 'Copiar', 2000);
+  });
+}
+
+function resetChpwModal() {
+  ['chpw-current','chpw-new1','chpw-new2'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('chpw-error').classList.remove('show');
+  document.getElementById('chpw-step1').style.display = 'block';
+  document.getElementById('chpw-step2').style.display = 'none';
+  document.getElementById('chpw-footer').innerHTML =
+    `<button class="btn btn-secondary" onclick="closeModal('modal-change-pw')">Cancelar</button>
+     <button class="btn btn-primary" id="chpw-generate-btn" onclick="doGenerateNewHash()">Generar nuevo hash →</button>`;
+}
+
+function doLogout() {
+  sessionStorage.removeItem(SESSION_KEY);
+  location.reload();
+}
+
+function showApp() {
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('app-shell').classList.remove('hidden');
+  renderSidebar();
+  if (data.notes.length > 0 || data.payments.length > 0) renderTimeline();
+}
+
+function togglePw(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
+  else { inp.type = 'password'; btn.textContent = '👁️'; }
+}
+
+document.getElementById('login-pw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+document.getElementById('setup-pw').addEventListener('keydown',  e => { if (e.key === 'Enter') generateHash(); });
+
+// ═══════════════════════════════════════════════
+//  APP DATA
+// ═══════════════════════════════════════════════
+let data = JSON.parse(localStorage.getItem('inmobiliaria-v2') || '{"props":[],"notes":[],"payments":[]}');
+if (!data.payments) data.payments = [];
+let currentPropId = null;
+let editingPropId = null;
+let editingNoteId = null;
+let editingPaymentId = null;
+let currentNoteType = 'free';
+let selectedDay = null;
+let currentView = 'home';
+
+function save() { localStorage.setItem('inmobiliaria-v2', JSON.stringify(data)); }
+function uid()  { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+
+// ── DATE HELPERS ──────────────────────────────
+function today() { const d = new Date(); d.setHours(0,0,0,0); return d; }
+
+function daysFromNow(dateStr) {
+  if (!dateStr) return null;
+  return Math.round((new Date(dateStr + 'T00:00:00') - today()) / 86400000);
+}
+
+function daysLabel(days) {
+  if (days === null) return null;
+  if (days < 0)   return { text: `Vencido hace ${Math.abs(days)}d`, cls: 'days-overdue' };
+  if (days === 0) return { text: 'Hoy', cls: 'days-soon' };
+  if (days <= 30) return { text: `En ${days}d`, cls: 'days-soon' };
+  return { text: `En ${days}d`, cls: 'days-ok' };
+}
+
+function formatDate(s) {
+  if (!s) return '';
+  const [y,m,d] = s.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function monthName(s) {
+  if (!s) return '';
+  return new Date(s+'T00:00:00').toLocaleDateString('es-AR', { month: 'short', year: 'numeric' });
+}
+
+function advanceMonth(dateStr, dom) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setMonth(d.getMonth() + 1);
+  d.setDate(Math.min(dom, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
+  return d.toISOString().slice(0,10);
+}
+
+function nextDueFrom(dom) {
+  const t = today();
+  const c = new Date(t.getFullYear(), t.getMonth(), dom);
+  if (c < t) c.setMonth(c.getMonth() + 1);
+  return c.toISOString().slice(0,10);
+}
+
+// ── PAYMENT STATUS ────────────────────────────
+function paymentStatus(p) {
+  const days = daysFromNow(p.nextDue);
+  if (days === null)  return { key:'due',     label:'Pendiente',              cls:'chip-due',     cardCls:'status-due' };
+  if (days < 0)       return { key:'overdue', label:`Vencido hace ${Math.abs(days)}d`, cls:'chip-overdue', cardCls:'status-overdue' };
+  if (days === 0)     return { key:'due',     label:'Vence hoy',              cls:'chip-due',     cardCls:'status-due' };
+  if (days <= 7)      return { key:'due',     label:`Vence en ${days}d`,      cls:'chip-due',     cardCls:'status-due' };
+  return               { key:'paid',    label:`Próximo: ${formatDate(p.nextDue)}`, cls:'chip-paid', cardCls:'status-paid' };
+}
+
+// ── SIDEBAR ───────────────────────────────────
+function renderSidebar() {
+  const q    = document.getElementById('search-input').value.toLowerCase();
+  const list = document.getElementById('prop-list');
+  const props = data.props.filter(p => p.name.toLowerCase().includes(q));
+  document.getElementById('prop-count').textContent = data.props.length;
+
+  if (!props.length) {
+    list.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">${q ? 'Sin resultados' : 'Agregá una propiedad'}</div>`;
+    return;
+  }
+  list.innerHTML = props.map(p => {
+    const urgentN = data.notes.filter(n => n.propId === p.id && daysFromNow(n.date) !== null && daysFromNow(n.date) <= 7).length;
+    const urgentP = data.payments.filter(pm => pm.propId === p.id && paymentStatus(pm).key !== 'paid').length;
+    const u = urgentN + urgentP;
+    return `<div class="prop-item ${currentPropId===p.id?'active':''}" onclick="openProp('${p.id}')">
+      <div class="prop-icon">🏠</div>
+      <div style="flex:1;min-width:0">
+        <div class="prop-name">${esc(p.name)}</div>
+        ${p.tenant?`<div class="prop-meta">${esc(p.tenant)}</div>`:''}
+      </div>
+      ${u?`<div class="badge">${u}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ── VIEWS ─────────────────────────────────────
+function openView(v) { currentView=v; currentPropId=null; renderSidebar(); if(v==='timeline') renderTimeline(); }
+
+function renderTimeline() {
+  const allNotes = data.notes.map(n=>({...n,prop:data.props.find(p=>p.id===n.propId),days:daysFromNow(n.date)}))
+    .sort((a,b)=>a.date&&b.date?new Date(a.date)-new Date(b.date):a.date?-1:1);
+  const allPays  = data.payments.map(pm=>({...pm,prop:data.props.find(p=>p.id===pm.propId),status:paymentStatus(pm)}))
+    .sort((a,b)=>a.nextDue&&b.nextDue?new Date(a.nextDue)-new Date(b.nextDue):0);
+
+  const overdueN  = allNotes.filter(n=>n.days!==null&&n.days<0);
+  const upcomingN = allNotes.filter(n=>n.days!==null&&n.days>=0);
+  const noDueN    = allNotes.filter(n=>n.days===null);
+  const urgentP   = allPays.filter(pm=>pm.status.key!=='paid');
+  const okP       = allPays.filter(pm=>pm.status.key==='paid');
+  const totalU    = urgentP.length + overdueN.length + upcomingN.filter(n=>n.days<=7).length;
+
+  let h = `<div class="panel-title">📅 Agenda general</div>
+    <div class="panel-sub">${data.notes.length} nota(s) · ${data.payments.length} pago(s) recurrente(s)</div>`;
+  if (totalU) h += `<div class="alert-banner">⚠️ <strong>${totalU} ítem(s)</strong> requieren atención.</div>`;
+  if (urgentP.length) { h+=`<div class="section-label">💰 Pagos pendientes</div>`; h+=urgentP.map(pm=>paymentCardHTML(pm,true)).join(''); }
+  if (overdueN.length){ h+=`<div class="section-label">⛔ Notas vencidas</div>`; h+=overdueN.map(n=>noteCardHTML(n,true)).join(''); }
+  if (upcomingN.length){ h+=`<div class="section-label">📌 Próximas notas</div>`; h+=upcomingN.map(n=>noteCardHTML(n,true)).join(''); }
+  if (okP.length)     { h+=`<div class="section-label">✅ Pagos al día</div>`; h+=okP.map(pm=>paymentCardHTML(pm,true)).join(''); }
+  if (noDueN.length)  { h+=`<div class="section-label">📋 Notas sin fecha</div>`; h+=noDueN.map(n=>noteCardHTML(n,true)).join(''); }
+  if (!allNotes.length&&!allPays.length) h+=`<div class="empty"><div class="empty-icon">📭</div><div class="empty-title">Sin datos aún</div><div class="empty-sub">Abrí una propiedad y empezá a cargar pagos y notas.</div></div>`;
+
+  document.getElementById('main-content').innerHTML = h;
+}
+
+function openProp(id) { currentPropId=id; currentView='prop'; renderSidebar(); renderProp(); }
+
+function renderProp() {
+  const prop = data.props.find(p=>p.id===currentPropId); if(!prop) return;
+  const notes    = data.notes.filter(n=>n.propId===prop.id).map(n=>({...n,days:daysFromNow(n.date)}))
+    .sort((a,b)=>a.date&&b.date?new Date(a.date)-new Date(b.date):a.date?-1:1);
+  const payments = data.payments.filter(pm=>pm.propId===prop.id).map(pm=>({...pm,status:paymentStatus(pm)}))
+    .sort((a,b)=>a.nextDue&&b.nextDue?new Date(a.nextDue)-new Date(b.nextDue):0);
+
+  const contracts = notes.filter(n=>n.type==='contract');
+  const free      = notes.filter(n=>n.type==='free');
+
+  let h = `<div class="prop-detail-header">
+    <div>
+      <div class="prop-detail-title">🏠 ${esc(prop.name)}</div>
+      ${prop.addr?`<div class="prop-detail-addr">📍 ${esc(prop.addr)}</div>`:''}
+      ${prop.tenant?`<div class="prop-detail-addr">👤 ${esc(prop.tenant)}</div>`:''}
+    </div>
+    <div class="prop-action-row">
+      <button class="btn btn-secondary btn-sm" onclick="showEditProp('${prop.id}')">✏️ Editar</button>
+      <button class="btn btn-secondary btn-sm" onclick="showAddNote('${prop.id}')">📝 Nota</button>
+      <button class="btn btn-primary btn-sm" onclick="showAddPayment('${prop.id}')">💰 Pago</button>
+    </div>
+  </div>`;
+
+  h += `<div class="section-label">💰 Pagos recurrentes</div>`;
+  if (!payments.length)
+    h += `<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;padding:12px;background:var(--surface);border-radius:var(--radius);border:1px dashed var(--border)">Sin pagos. Usá "💰 Pago" para agregar uno.</div>`;
+  else h += payments.map(pm=>paymentCardHTML(pm,false)).join('');
+
+  if (contracts.length) { h+=`<div class="section-label" style="margin-top:24px">📄 Vencimientos de contrato</div>`; h+=contracts.map(n=>noteCardHTML(n,false)).join(''); }
+  if (free.length)      { h+=`<div class="section-label" style="margin-top:${contracts.length?16:24}px">📝 Notas libres</div>`; h+=free.map(n=>noteCardHTML(n,false)).join(''); }
+  if (!contracts.length&&!free.length) h+=`<div class="divider"></div><div style="font-size:13px;color:var(--text-muted)">Sin notas. Usá "📝 Nota" para agregar vencimientos o recordatorios.</div>`;
+
+  document.getElementById('main-content').innerHTML = h;
+}
+
+// ── PAYMENT CARD ──────────────────────────────
+function paymentCardHTML(pm, showProp) {
+  const st = pm.status || paymentStatus(pm);
+  const propName = pm.prop ? pm.prop.name : (data.props.find(p=>p.id===pm.propId)?.name||'');
+  const amt = pm.amount ? `<span class="payment-amount">${pm.currency||'$'} ${Number(pm.amount).toLocaleString('es-AR')}</span>` : '';
+  const history = pm.paidHistory?.length
+    ? `<div class="payment-history"><span>Historial:</span>${pm.paidHistory.slice(-6).map(h=>`<span class="history-pill">✓ ${monthName(h)}</span>`).join('')}</div>`
+    : '';
+  return `<div class="payment-card ${st.cardCls}">
+    <div class="payment-main">
+      <div class="payment-icon">💰</div>
+      <div class="payment-info">
+        ${showProp&&propName?`<div class="payment-prop">${esc(propName)}</div>`:''}
+        <div class="payment-name">${esc(pm.name)}</div>
+        <div class="payment-detail">${amt}<span>Día ${pm.dayOfMonth} de cada mes</span><span class="payment-status-chip ${st.cls}">${st.label}</span></div>
+      </div>
+      <div class="payment-actions">
+        ${st.key!=='paid'
+          ? `<button class="btn-mark-paid" onclick="markPaid('${pm.id}')">✅ Cobrado</button>`
+          : `<span style="font-size:11px;color:var(--green);font-weight:600">✓ Al día</span>`}
+        <button class="icon-btn" onclick="showEditPayment('${pm.id}')">✏️</button>
+        <button class="icon-btn danger" onclick="confirmDelete('payment','${pm.id}')">🗑️</button>
+      </div>
+    </div>${history}</div>`;
+}
+
+// ── NOTE CARD ─────────────────────────────────
+function noteCardHTML(n, showProp) {
+  const t = { contract:{emoji:'📄',tag:'Contrato',cls:'tag-contract'}, free:{emoji:'📝',tag:'Nota libre',cls:'tag-free'} }[n.type] || { emoji:'📝',tag:'Nota',cls:'tag-free' };
+  const dl = n.days!==null ? daysLabel(n.days) : null;
+  const propName = n.prop ? n.prop.name : (data.props.find(p=>p.id===n.propId)?.name||'');
+  return `<div class="note-card type-${n.type}">
+    <div class="note-type-dot">${t.emoji}</div>
+    <div class="note-body">
+      ${showProp&&propName?`<div class="note-prop">${esc(propName)}</div>`:''}
+      <div class="note-text">${esc(n.text)}</div>
+      <div class="note-footer">
+        <span class="tag ${t.cls}">${t.tag}</span>
+        ${n.date?`<span class="note-date">📅 ${formatDate(n.date)}</span>`:''}
+        ${dl?`<span class="days-chip ${dl.cls}">${dl.text}</span>`:''}
+      </div>
+    </div>
+    <div class="note-actions">
+      <button class="icon-btn" onclick="showEditNote('${n.id}')">✏️</button>
+      <button class="icon-btn danger" onclick="confirmDelete('note','${n.id}')">🗑️</button>
+    </div>
+  </div>`;
+}
+
+// ── MARK PAID ─────────────────────────────────
+function markPaid(id) {
+  const pm = data.payments.find(x=>x.id===id); if(!pm) return;
+  if (!pm.paidHistory) pm.paidHistory=[];
+  pm.paidHistory.push(pm.nextDue || new Date().toISOString().slice(0,10));
+  pm.nextDue = advanceMonth(pm.nextDue || new Date().toISOString().slice(0,10), pm.dayOfMonth);
+  save(); renderSidebar();
+  if (currentView==='timeline') renderTimeline(); else renderProp();
+}
+
+// ── PROPERTY CRUD ─────────────────────────────
+function showAddProp() {
+  editingPropId=null;
+  document.getElementById('modal-prop-title').textContent='Nueva Propiedad';
+  ['prop-name','prop-addr','prop-tenant'].forEach(id=>document.getElementById(id).value='');
+  openModal('modal-prop');
+  setTimeout(()=>document.getElementById('prop-name').focus(),100);
+}
+function showEditProp(id) {
+  editingPropId=id; const p=data.props.find(x=>x.id===id);
+  document.getElementById('modal-prop-title').textContent='Editar Propiedad';
+  document.getElementById('prop-name').value=p.name;
+  document.getElementById('prop-addr').value=p.addr||'';
+  document.getElementById('prop-tenant').value=p.tenant||'';
+  openModal('modal-prop');
+}
+function saveProp() {
+  const name=document.getElementById('prop-name').value.trim(); if(!name){document.getElementById('prop-name').focus();return;}
+  const addr=document.getElementById('prop-addr').value.trim();
+  const tenant=document.getElementById('prop-tenant').value.trim();
+  if (editingPropId) { Object.assign(data.props.find(x=>x.id===editingPropId),{name,addr,tenant}); }
+  else { const p={id:uid(),name,addr,tenant}; data.props.push(p); currentPropId=p.id; }
+  save(); closeModal('modal-prop'); renderSidebar();
+  if(editingPropId) renderProp(); else openProp(currentPropId);
+}
+
+// ── PAYMENT CRUD ──────────────────────────────
+function buildDayGrid(sel) {
+  selectedDay=sel;
+  document.getElementById('day-grid').innerHTML = Array.from({length:28},(_,i)=>i+1).map(d=>
+    `<button type="button" class="day-btn ${sel===d?'selected':''}" onclick="pickDay(${d})">${d}</button>`).join('');
+}
+function pickDay(d) {
+  selectedDay=d;
+  const cur=document.getElementById('pay-next-due').value;
+  if(cur){ const p=cur.split('-'); const mx=new Date(+p[0],+p[1],0).getDate(); p[2]=String(Math.min(d,mx)).padStart(2,'0'); document.getElementById('pay-next-due').value=p.join('-'); }
+  else document.getElementById('pay-next-due').value=nextDueFrom(d);
+  buildDayGrid(d);
+}
+function showAddPayment(propId) {
+  editingPaymentId=null; currentPropId=propId;
+  document.getElementById('modal-payment-title').textContent='Nuevo Pago Recurrente';
+  ['pay-name','pay-amount','pay-next-due'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pay-currency').value='$';
+  buildDayGrid(1); openModal('modal-payment');
+  setTimeout(()=>document.getElementById('pay-name').focus(),100);
+}
+function showEditPayment(id) {
+  editingPaymentId=id; const pm=data.payments.find(x=>x.id===id); currentPropId=pm.propId;
+  document.getElementById('modal-payment-title').textContent='Editar Pago';
+  document.getElementById('pay-name').value=pm.name;
+  document.getElementById('pay-amount').value=pm.amount||'';
+  document.getElementById('pay-currency').value=pm.currency||'$';
+  document.getElementById('pay-next-due').value=pm.nextDue||'';
+  buildDayGrid(pm.dayOfMonth||1); openModal('modal-payment');
+}
+function savePayment() {
+  const name=document.getElementById('pay-name').value.trim(); if(!name){document.getElementById('pay-name').focus();return;}
+  const amount=parseFloat(document.getElementById('pay-amount').value)||null;
+  const currency=document.getElementById('pay-currency').value;
+  const dayOfMonth=selectedDay||1;
+  const nextDue=document.getElementById('pay-next-due').value||nextDueFrom(dayOfMonth);
+  if(editingPaymentId){ Object.assign(data.payments.find(x=>x.id===editingPaymentId),{name,amount,currency,dayOfMonth,nextDue}); }
+  else data.payments.push({id:uid(),propId:currentPropId,name,amount,currency,dayOfMonth,nextDue,paidHistory:[]});
+  save(); closeModal('modal-payment'); renderSidebar();
+  if(currentView==='timeline') renderTimeline(); else renderProp();
+}
+
+// ── NOTE CRUD ─────────────────────────────────
+function showAddNote(propId) {
+  editingNoteId=null; currentPropId=propId;
+  document.getElementById('modal-note-title').textContent='Nueva Nota';
+  document.getElementById('note-text').value=''; document.getElementById('note-date').value='';
+  selectType('free'); openModal('modal-note');
+  setTimeout(()=>document.getElementById('note-text').focus(),100);
+}
+function showEditNote(id) {
+  editingNoteId=id; const n=data.notes.find(x=>x.id===id);
+  document.getElementById('modal-note-title').textContent='Editar Nota';
+  document.getElementById('note-text').value=n.text; document.getElementById('note-date').value=n.date||'';
+  selectType(n.type); openModal('modal-note');
+}
+function saveNote() {
+  const text=document.getElementById('note-text').value.trim(); if(!text){document.getElementById('note-text').focus();return;}
+  const date=document.getElementById('note-date').value||null;
+  if(editingNoteId){ const n=data.notes.find(x=>x.id===editingNoteId); Object.assign(n,{text,date,type:currentNoteType}); currentPropId=n.propId; }
+  else data.notes.push({id:uid(),propId:currentPropId,type:currentNoteType,text,date});
+  save(); closeModal('modal-note'); renderSidebar();
+  if(currentView==='timeline') renderTimeline(); else renderProp();
+}
+
+// ── DELETE ────────────────────────────────────
+function confirmDelete(kind,id) {
+  const item = kind==='note' ? data.notes.find(x=>x.id===id) : data.payments.find(x=>x.id===id);
+  document.getElementById('confirm-msg').textContent = kind==='note'
+    ? `¿Eliminar la nota "${item.text.slice(0,60)}"?`
+    : `¿Eliminar el pago "${item.name}"? Se perderá el historial.`;
+  document.getElementById('confirm-ok-btn').onclick = () => {
+    if(kind==='note')    data.notes    = data.notes.filter(x=>x.id!==id);
+    if(kind==='payment') data.payments = data.payments.filter(x=>x.id!==id);
+    save(); closeModal('modal-confirm'); renderSidebar();
+    if(currentView==='timeline') renderTimeline(); else renderProp();
+  };
+  openModal('modal-confirm');
+}
+
+// ── TYPE SELECTOR ─────────────────────────────
+function selectType(type) {
+  currentNoteType=type;
+  document.querySelectorAll('.type-opt').forEach(el=>{ el.className='type-opt'; if(el.dataset.type===type) el.classList.add(`selected-${type}`); });
+}
+
+// ── MODAL HELPERS ─────────────────────────────
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(el=>el.addEventListener('click',e=>{if(e.target===el) closeModal(el.id);}));
+document.addEventListener('keydown',e=>{if(e.key==='Escape') document.querySelectorAll('.modal-overlay.open').forEach(m=>closeModal(m.id));});
+
+// ── UTILS ─────────────────────────────────────
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── BOOT ──────────────────────────────────────
+initAuth();
+</script>
+</body>
+</html>
