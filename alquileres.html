@@ -910,7 +910,6 @@ async function initFirebase() {
     db = firebase.firestore();
     const [col, doc] = FIRESTORE_DOC.split('/');
     // Primera conexión: migrar localStorage si Firestore está vacío
-    const [col, doc] = FIRESTORE_DOC.split('/');
     const snap = await db.collection(col).doc(doc).get();
     if (!snap.exists) {
       const localRaw = localStorage.getItem('inmobiliaria-v2') || localStorage.getItem('alquileres-diaz');
