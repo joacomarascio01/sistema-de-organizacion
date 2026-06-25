@@ -673,7 +673,7 @@
 //  │  Pegá aquí el hash generado por la app.      │
 //  │  Vacío ("") = modo configuración inicial.    │
 //  └─────────────────────────────────────────────┘
-const SHARED_HASH  = "014ceedbc1bfbdeaedc10504dcb2789cee7a153d1b8e3f27ab81db314e4e79a8";
+const SHARED_HASH  = "";
 const SESSION_KEY  = 'inmo-session';
 
 async function sha256(str) {
@@ -924,6 +924,21 @@ async function initFirebase() {
     if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
     db = firebase.firestore();
     const [col, doc] = FIRESTORE_DOC.split('/');
+    // Primera conexión: migrar localStorage si Firestore está vacío
+    const [col, doc] = FIRESTORE_DOC.split('/');
+    const snap = await db.collection(col).doc(doc).get();
+    if (!snap.exists) {
+      const localRaw = localStorage.getItem('inmobiliaria-v2') || localStorage.getItem('alquileres-diaz');
+      if (localRaw) {
+        const localData = JSON.parse(localRaw);
+        if ((localData.props?.length || 0) + (localData.notes?.length || 0) + (localData.payments?.length || 0) > 0) {
+          document.getElementById('loading-msg').textContent = 'Migrando datos locales…';
+          await db.collection(col).doc(doc).set(localData);
+          console.log('Datos migrados desde localStorage a Firestore.');
+        }
+      }
+    }
+
     // Escuchar cambios en tiempo real
     db.collection(col).doc(doc).onSnapshot(snap => {
       if (snap.exists) {
